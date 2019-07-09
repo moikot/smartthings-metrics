@@ -92,7 +92,7 @@ deleteTag() {
   declare -r token="${3}"
 
   local code=$(curl -s -o /dev/null -LI -w "%{http_code}" \
-    https://hub.docker.com/v2/repositories/"${image}"/tags/"${tag}"/ \
+    https://cloud.docker.com/v2/repositories/"${image}"/tags/"${tag}"/ \
     -X DELETE \
     -H "Authorization: JWT ${token}")
 
