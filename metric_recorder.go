@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	"strings"
 
 	"github.com/moikot/smartthings-metrics/extractors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -21,6 +23,14 @@ type metricRecorder struct {
 	gaugeVecs map[string]*prometheus.GaugeVec
 }
 
+func printLabels(labels prometheus.Labels) string {
+	var sb []string
+	for k, v := range labels {
+		sb = append(sb, fmt.Sprintf("%s='%s'", k, v))
+	}
+	return strings.Join(sb, ", ")
+}
+
 func (r *metricRecorder) Record(attr *extractors.AttributeValue) {
 	gaugeVec, ok := r.gaugeVecs[attr.Name]
 	if !ok {
@@ -35,7 +45,8 @@ func (r *metricRecorder) Record(attr *extractors.AttributeValue) {
 	}
 
 	gaugeVec.With(labels).Set(attr.Value)
-	log.Printf("val %f", attr.Value)
+
+	log.Printf("attr: '%s' value: %f labels: %s", attr.Name, attr.Value, printLabels(labels))
 }
 
 func newGaugeVec(attr *extractors.AttributeValue) *prometheus.GaugeVec {

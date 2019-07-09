@@ -68,7 +68,7 @@ func Run(token, intervalStr string) int {
 		}
 	}()
 
-	signal.Notify(stopChan, os.Interrupt)
+	signal.Notify(stopChan, os.Interrupt, os.Kill)
 	<-stopChan
 
 	return 0

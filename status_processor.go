@@ -8,13 +8,27 @@ import (
 	"github.com/moikot/smartthings-metrics/extractors"
 )
 
+type Extractors map[string]extractors.ValueExtractor
+
+func (exts Extractors) Add(e extractors.ValueExtractor) {
+	exts[e.ID()] = e
+}
+
 type StatusProcessor interface {
 	Process(device *models.Device, status *models.DeviceStatus) ([]*extractors.AttributeValue, error)
 }
 
 func NewStatusProcessor() StatusProcessor {
-	exts := extractors.Extractors{}
+	exts := Extractors{}
+
 	exts.Add(extractors.NewTemperatureMeasurement())
+	exts.Add(extractors.NewBattery())
+	exts.Add(extractors.NewRelativeHumidityMeasurement())
+	exts.Add(extractors.NewIlluminanceMeasurement())
+	exts.Add(extractors.NewMotionSensor())
+	exts.Add(extractors.NewWaterSensor())
+	exts.Add(extractors.NewPowerMeter())
+	exts.Add(extractors.NewOutlet())
 
 	return &statusProcessor{
 		extractors: exts,
@@ -22,7 +36,7 @@ func NewStatusProcessor() StatusProcessor {
 }
 
 type statusProcessor struct {
-	extractors extractors.Extractors
+	extractors Extractors
 }
 
 func (b statusProcessor) Process(device *models.Device, status *models.DeviceStatus) ([]*extractors.AttributeValue, error) {
@@ -36,6 +50,7 @@ func (b statusProcessor) Process(device *models.Device, status *models.DeviceSta
 				}
 
 				val.Name = toMetricName(capability) + "_" + toMetricName(val.Name)
+
 				val.Labels["name"] = device.Name
 				val.Labels["label"] = device.Label
 				val.Labels["device_type_name"] = device.DeviceTypeName
@@ -55,11 +70,11 @@ var (
 )
 
 func toMetricName(deviceName string) string {
-	deviceName = strings.ToLower(ToSnakeCase(deviceName))
+	deviceName = strings.ToLower(toSnakeCase(deviceName))
 	return notAlphaNum.ReplaceAllString(deviceName, "_")
 }
 
-func ToSnakeCase(str string) string {
+func toSnakeCase(str string) string {
 	snake := matchFirstCap.ReplaceAllString(str, "${1}_${2}")
 	snake = matchAllCap.ReplaceAllString(snake, "${1}_${2}")
 	return strings.ToLower(snake)

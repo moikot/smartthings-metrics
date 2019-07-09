@@ -1,5 +1,8 @@
 package main
 
+// Orchestrator reads device statuses, processes them converting
+// to records containing a name, a value and a set of labels.
+// Finally, it passes the resulting records to the recorder.
 type Orchestrator interface {
 	Execute() error
 }
@@ -8,14 +11,14 @@ func NewOrchestrator(token string) Orchestrator {
 	return &orchestrator{
 		recorder:  NewMetricRecorder(),
 		processor: NewStatusProcessor(),
-		reader:    NewStatusReader(token),
+		reader:    NewDeviceReader(token),
 	}
 }
 
 type orchestrator struct {
 	recorder  MetricRecorder
 	processor StatusProcessor
-	reader    StatusReader
+	reader    DeviceReader
 }
 
 func (o *orchestrator) Execute() error {
@@ -29,8 +32,8 @@ func (o *orchestrator) Execute() error {
 		if err != nil {
 			return err
 		}
-		for _, val := range values {
-			o.recorder.Record(val)
+		for _, value := range values {
+			o.recorder.Record(value)
 		}
 	}
 	return nil

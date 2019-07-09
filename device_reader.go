@@ -17,11 +17,11 @@ type DeviceStatus struct {
 	Status *models.DeviceStatus
 }
 
-type StatusReader interface {
+type DeviceReader interface {
 	Read() ([]*DeviceStatus, error)
 }
 
-func NewStatusReader(token string) StatusReader {
+func NewDeviceReader(token string) DeviceReader {
 	httpClient := &http.Client{
 		Timeout: time.Duration(10 * time.Second),
 	}
