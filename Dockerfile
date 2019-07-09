@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM moikot/golang-dep:1.11 as build-env
+FROM --platform=$BUILDPLATFORM moikot/golang-dep:1.12 as build-env
 
 # xx wraps go to automatically configure $GOOS, $GOARCH, and $GOARM
 # based on TARGETPLATFORM provided by Docker.
