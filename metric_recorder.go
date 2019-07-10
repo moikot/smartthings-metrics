@@ -7,6 +7,7 @@ import (
 
 	"github.com/moikot/smartthings-metrics/extractors"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 type MetricRecorder interface {
@@ -59,5 +60,5 @@ func newGaugeVec(attr *extractors.AttributeValue) *prometheus.GaugeVec {
 		labelNames = append(labelNames, name)
 	}
 
-	return prometheus.NewGaugeVec(opts, labelNames)
+	return promauto.NewGaugeVec(opts, labelNames)
 }
