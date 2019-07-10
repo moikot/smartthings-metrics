@@ -4,12 +4,18 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
+)
+
+const (
+	defaultPromAddr = ":9153"
 )
 
 var (
@@ -56,6 +62,8 @@ func Run(token, intervalStr string) int {
 		return 1
 	}
 
+	go servePrometheus(defaultPromAddr)
+
 	orchestrator := NewOrchestrator(token)
 
 	go func() {
@@ -72,4 +80,12 @@ func Run(token, intervalStr string) int {
 	<-stopChan
 
 	return 0
+}
+
+func servePrometheus(addr string) {
+	http.Handle("/metrics", promhttp.Handler())
+	err := http.ListenAndServe(addr, nil)
+	if err != nil {
+		panic("unable to create HTTP server, error: " + err.Error())
+	}
 }

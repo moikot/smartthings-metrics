@@ -208,11 +208,12 @@
   version = "v0.8.1"
 
 [[projects]]
-  digest = "1:f501bfa808e6af3af1bc7091f742e3a3289fba99ab9c29d194975b6d407a990c"
+  digest = "1:0de31727c88e9f4a4ae70c28b6caa27f39b25788daf2dc4f7406013421228144"
   name = "github.com/prometheus/client_golang"
   packages = [
     "prometheus",
     "prometheus/internal",
+    "prometheus/promhttp",
   ]
   pruneopts = "UT"
   revision = "50c4339db732beb2165735d2cde0bff78eb3c5a5"
@@ -322,6 +323,7 @@
     "github.com/go-openapi/strfmt",
     "github.com/pkg/errors",
     "github.com/prometheus/client_golang/prometheus",
+    "github.com/prometheus/client_golang/prometheus/promhttp",
     "github.com/sirupsen/logrus",
   ]
   solver-name = "gps-cdcl"
