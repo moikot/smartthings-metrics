@@ -1,13 +1,9 @@
-# This is a weird way of telling Travis to use the fast container-based test
-# runner instead of the slow VM-based runner.
-sudo: required
-dist: xenial
+dist: bionic
+os: linux
+language: shell
 
 language: go
 
-# Only the last two Go releases are supported by the Go team with security
-# updates. Any older versions be considered deprecated. Don't bother testing
-# with them.
 go:
   - 1.12.x
 
@@ -16,54 +12,58 @@ services:
 
 env:
   global:
-    - DOCKER_PLATFORMS="linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8"
-    - DOCKER_TAG="${TRAVIS_TAG}"
-    - DOCKER_CLI_EXPERIMENTAL=enabled
+    - DOCKER_PLATFORMS="linux/amd64,linux/arm64,linux/ppc64le,linux/s390x,linux/386,linux/arm/v7,linux/arm/v6"
     - APP_FOLDER=/go/src/github.com/moikot/smartthings-metrics/
-    - DOCKER_VERSION=5:18.09.4~3-0~ubuntu-xenial
 
-# Only clone the most recent commit.
 git:
   depth: 1
 
 before_install:
   - go get github.com/mattn/goveralls
 
-script:
-  # Restore packages using moikot/golang-dep
-  - >-
-    docker run --rm -v $(pwd):${APP_FOLDER} -w ${APP_FOLDER}
-    moikot/golang-dep ensure -vendor-only
-  # Run all the tests and report the coverage for all the packages
-  - go test -covermode=count -coverprofile=profile.cov -coverpkg=./... ./...
-  - $GOPATH/bin/goveralls -coverprofile=profile.cov -service=travis-ci
+stages:
+  - name: build and test
+    if: tag IS blank
+  - name: deploy
+    if: branch = master OR tag =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/
 
-before_deploy:
-  # Update docker to the latest version, enable experimental mode, enable BuildKit
-  - echo '{"experimental":true,"features":{"buildkit":true}}' | sudo tee /etc/docker/daemon.json
-  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
-  - sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
-  - sudo apt-get update
-  - sudo apt-get -y -o Dpkg::Options::="--force-confnew" install docker-ce
+matrix:
+  include:
 
-deploy:
-  provider: script
-  script: >-
-    bash -c "
-    ./.travis/build.sh build
-    ${APP_FOLDER}
-    ${DOCKER_IMAGE}
-    ${DOCKER_TAG}
-    ${DOCKER_PLATFORMS} &&
-    ./.travis/deploy.sh pushImages
-    ${DOCKER_IMAGE}
-    ${DOCKER_TAG}
-    ${DOCKER_PLATFORMS} &&
-    ./.travis/deploy.sh pushDescription
-    ${DOCKER_IMAGE}
-    README.md"
-  on:
-    tags: true
+    - stage: build and test
+      script:
+        # Restore packages using moikot/golang-dep
+        - >-
+          docker run --rm -v $(pwd):${APP_FOLDER} -w ${APP_FOLDER}
+          -u $(id -u ${USER}):$(id -g ${USER})
+          moikot/golang-dep ensure -vendor-only
+        # Run all the tests and report the coverage
+        - go test -covermode=count -coverprofile=profile.cov -coverpkg=./... ./...
+        - $GOPATH/bin/goveralls -coverprofile=profile.cov -service=travis-ci
+
+    - stage: deploy
+      script:
+        # Get scripts for building Docker images
+        - id=$(docker create moikot/docker-tools)
+        - docker cp $id:/scripts.sh /tmp/scripts.sh && docker rm -v $id
+        # Update docker to the latest version and enable BuildKit
+        - /tmp/scripts.sh update_docker
+        # Login to Doker Hub
+        - >-
+          echo "${DOCKER_PASSWORD}" |
+          docker login -u "${DOCKER_USERNAME}" --password-stdin
+        # Build multi-platform image and push it
+        - >-
+          /tmp/scripts.sh build_images
+          ${TRAVIS_REPO_SLUG} ${TRAVIS_BRANCH} ${DOCKER_PLATFORMS}
+          --push --build-arg APP_FOLDER=${APP_FOLDER}
+        # Push readme file for a tag
+        - |
+          if [ "${TRAVIS_BRANCH}" != "master" ]; then
+              /tmp/scripts.sh push_readme \
+              ${TRAVIS_REPO_SLUG} README.md \
+              ${DOCKER_USERNAME} ${DOCKER_PASSWORD}
+          fi
 
 notifications:
   email: false
