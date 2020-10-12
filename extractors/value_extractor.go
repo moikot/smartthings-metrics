@@ -10,23 +10,31 @@ import (
 	"github.com/SmartThingsOSS/smartapp-go/pkg/smartthings/models"
 )
 
-const (
-	unitLabel = "unit"
-)
-
 type AttributeValue struct {
-	Name   string
-	Labels Labels
-	Value  float64
+	value  float64
+	unit   string
+}
+
+func (a AttributeValue) Value() float64 {
+	return a.value;
+}
+
+func (a AttributeValue) Unit() string {
+	return a.unit;
+}
+
+func NewAttributeValue(value float64, unit string) *AttributeValue {
+	return &AttributeValue{
+		value: value,
+		unit: unit,
+	}
 }
 
 type ValueExtractor interface {
 	ID() string
-	Name() string
+	Attribute() string
 	Extract(status models.CapabilityStatus) (*AttributeValue, error)
 }
-
-type Labels map[string]string
 
 func getNumberWithUnit(status models.CapabilityStatus, attr string) (*AttributeValue, error) {
 	attribute, ok := status[attr]
@@ -36,7 +44,7 @@ func getNumberWithUnit(status models.CapabilityStatus, attr string) (*AttributeV
 
 	valueNum, ok := (attribute.Value).(json.Number)
 	if !ok {
-		return nil, fmt.Errorf("value has unexpected type '%s', expected '%s'",
+		return nil, fmt.Errorf("value has unexpected type '%v', expected '%s'",
 			reflect.TypeOf(attribute.Value), "json.Number")
 	}
 
@@ -46,13 +54,7 @@ func getNumberWithUnit(status models.CapabilityStatus, attr string) (*AttributeV
 			valueNum.String())
 	}
 
-	return &AttributeValue{
-		Name: attr,
-		Labels: Labels{
-			unitLabel: attribute.Unit,
-		},
-		Value: value,
-	}, nil
+	return NewAttributeValue(value, attribute.Unit), nil
 }
 
 func getEnumValue(status models.CapabilityStatus, attr string, enumVals map[string]float64) (*AttributeValue, error) {
@@ -73,9 +75,5 @@ func getEnumValue(status models.CapabilityStatus, attr string, enumVals map[stri
 			valueStr, attr)
 	}
 
-	return &AttributeValue{
-		Name:   attr,
-		Labels: Labels{},
-		Value:  value,
-	}, nil
+	return NewAttributeValue(value, ""), nil
 }

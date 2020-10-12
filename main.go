@@ -29,6 +29,8 @@ func main() {
 	flag.StringVar(&token, "token", os.Getenv("API_TOKEN"), "The API token.")
 	flag.StringVar(&intervalStr, "interval", os.Getenv("REFRESH_INTERVAL"), "The status refresh interval in seconds.")
 
+	flag.Parse()
+
 	exitFunc(Run(token, intervalStr))
 }
 
@@ -64,7 +66,7 @@ func Run(token, intervalStr string) int {
 
 	go servePrometheus(defaultPromAddr)
 
-	orchestrator := NewOrchestrator(token)
+	orchestrator := NewOrchestrator(token, l)
 
 	go func() {
 		for {

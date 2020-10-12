@@ -2,25 +2,26 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"github.com/sirupsen/logrus"
 	"strings"
 
-	"github.com/moikot/smartthings-metrics/extractors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 type MetricRecorder interface {
-	Record(attr *extractors.AttributeValue)
+	Record(attr *Measurement)
 }
 
-func NewMetricRecorder() MetricRecorder {
+func NewMetricRecorder(log logrus.FieldLogger) MetricRecorder {
 	return &metricRecorder{
+		log: log,
 		gaugeVecs: map[string]*prometheus.GaugeVec{},
 	}
 }
 
 type metricRecorder struct {
+	log logrus.FieldLogger
 	gaugeVecs map[string]*prometheus.GaugeVec
 }
 
@@ -32,7 +33,7 @@ func printLabels(labels prometheus.Labels) string {
 	return strings.Join(sb, ", ")
 }
 
-func (r *metricRecorder) Record(attr *extractors.AttributeValue) {
+func (r *metricRecorder) Record(attr *Measurement) {
 	gaugeVec, ok := r.gaugeVecs[attr.Name]
 	if !ok {
 		gaugeVec = newGaugeVec(attr)
@@ -47,10 +48,10 @@ func (r *metricRecorder) Record(attr *extractors.AttributeValue) {
 
 	gaugeVec.With(labels).Set(attr.Value)
 
-	log.Printf("attr: '%s' value: %f labels: %s", attr.Name, attr.Value, printLabels(labels))
+	r.log.Infof("gauge: '%s' value: %f labels: %s", attr.Name, attr.Value, printLabels(labels))
 }
 
-func newGaugeVec(attr *extractors.AttributeValue) *prometheus.GaugeVec {
+func newGaugeVec(attr *Measurement) *prometheus.GaugeVec {
 	opts := prometheus.GaugeOpts{
 		Name: attr.Name,
 	}
