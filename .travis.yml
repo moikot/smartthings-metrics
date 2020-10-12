@@ -32,11 +32,6 @@ matrix:
 
     - stage: build and test
       script:
-        # Restore packages using moikot/golang-dep
-        - >-
-          docker run --rm -v $(pwd):${APP_FOLDER} -w ${APP_FOLDER}
-          -u $(id -u ${USER}):$(id -g ${USER})
-          moikot/golang-dep ensure -vendor-only
         # Run all the tests and report the coverage
         - go test -covermode=count -coverprofile=profile.cov -coverpkg=./... ./...
         - $GOPATH/bin/goveralls -coverprofile=profile.cov -service=travis-ci
