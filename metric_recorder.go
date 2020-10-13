@@ -17,12 +17,14 @@ func NewMetricRecorder(log logrus.FieldLogger) MetricRecorder {
 	return &metricRecorder{
 		log: log,
 		gaugeVecs: map[string]*prometheus.GaugeVec{},
+		measurements: map[string]*Measurement{},
 	}
 }
 
 type metricRecorder struct {
 	log logrus.FieldLogger
 	gaugeVecs map[string]*prometheus.GaugeVec
+	measurements map[string]*Measurement
 }
 
 func printLabels(labels prometheus.Labels) string {
@@ -34,36 +36,34 @@ func printLabels(labels prometheus.Labels) string {
 }
 
 func (r *metricRecorder) Record(measurements []*Measurement) {
-	observedMeasurements := map[string]struct{}{}
+	observedMeasurements := map[string]*Measurement{}
 
 	for _, measurement := range measurements {
 		gaugeVec, ok := r.gaugeVecs[measurement.Name]
-		if !ok || gaugeVec == nil {
+		if !ok {
 			gaugeVec = newGaugeVec(measurement)
 			r.gaugeVecs[measurement.Name] = gaugeVec
 		}
-		// Add to the observed measurements
-		observedMeasurements[measurement.Name] = struct{}{}
 
-		labels := prometheus.Labels{}
+		measurementKey := measurement.Name + " " + fmt.Sprint(measurement.Labels)
+		observedMeasurements[measurementKey] = measurement
 
-		for label, val := range measurement.Labels {
-			labels[label] = val
-		}
+		gaugeVec.With(measurement.Labels).Set(measurement.Value)
 
-		gaugeVec.With(labels).Set(measurement.Value)
-
-		r.log.Infof("gauge: '%s' value: %f labels: %s", measurement.Name, measurement.Value, printLabels(labels))
+		r.log.Infof("gauge: '%s' value: %f labels: %s", measurement.Name, measurement.Value, printLabels(measurement.Labels))
 	}
 
-	// Clean not observed measurements
-	for measurement, gaugeVec := range r.gaugeVecs {
-		if _, ok := observedMeasurements[measurement]; !ok && gaugeVec != nil {
-			prometheus.Unregister(gaugeVec)
-			r.gaugeVecs[measurement] = nil
-			r.log.Infof("gauge: '%s' is not observed", measurement)
+	// Delete not observed vectors
+	for key, measurement := range r.measurements {
+		if _, ok := observedMeasurements[key]; !ok {
+			if gaugeVec, ok := r.gaugeVecs[measurement.Name]; ok {
+				gaugeVec.Delete(measurement.Labels)
+				r.log.Infof("removed gauge: '%s' labels: %s", measurement.Name, printLabels(measurement.Labels))
+			}
 		}
 	}
+
+	r.measurements = observedMeasurements
 }
 
 func newGaugeVec(measurement *Measurement) *prometheus.GaugeVec {

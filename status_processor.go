@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"regexp"
 	"strings"
@@ -69,11 +70,9 @@ var unitsMap = map[string]string {
 	"K": "degrees_kelvin",
 }
 
-type Labels map[string]string
-
 type Measurement struct {
 	Name   string
-	Labels Labels
+	Labels prometheus.Labels
 	Value  float64
 }
 
@@ -142,7 +141,7 @@ func (c statusProcessor) Process(device *models.Device, status *models.DeviceSta
 						unitSuffix = "_" + unit
 					}
 
-					measurement := &Measurement{Labels: Labels{}}
+					measurement := &Measurement{Labels: prometheus.Labels{}}
 					measurement.Name = "smartthings_" + toMetricName(capability) + "_" + toMetricName(extractor.Attribute()) + unitSuffix
 					measurement.Value = val.Value()
 					measurement.Labels["name"] = device.Name
