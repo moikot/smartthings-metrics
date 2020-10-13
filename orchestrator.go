@@ -30,11 +30,12 @@ func (o *orchestrator) Execute() error {
 		return err
 	}
 
+	measurements := []*Measurement{}
+
 	for _, status := range statuses {
-		values := o.processor.Process(status.Device, status.Status)
-		for _, value := range values {
-			o.recorder.Record(value)
-		}
+		measurements = append(measurements, o.processor.Process(status.Device, status.Status)...)
 	}
+
+	o.recorder.Record(measurements)
 	return nil
 }
