@@ -1,13 +1,14 @@
 package main
 
 import (
+	"github.com/moikot/smartthings-metrics/extractors"
+	"github.com/moikot/smartthings-metrics/health"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"regexp"
 	"strings"
 
 	"github.com/SmartThingsOSS/smartapp-go/pkg/smartthings/models"
-	"github.com/moikot/smartthings-metrics/extractors"
 )
 
 type Extractors map[string][]extractors.ValueExtractor
@@ -70,6 +71,12 @@ var unitsMap = map[string]string {
 	"K": "degrees_kelvin",
 }
 
+var healthStateMap = map[string]float64 {
+	"OFFLINE": 0,
+	"UNHEALTHY": 1.0,
+	"ONLINE": 2.0,
+}
+
 type Measurement struct {
 	Name   string
 	Labels prometheus.Labels
@@ -77,7 +84,7 @@ type Measurement struct {
 }
 
 type StatusProcessor interface {
-	Process(device *models.Device, status *models.DeviceStatus) []*Measurement
+	Process(statuses []*DeviceStatus) []*Measurement
 }
 
 func NewStatusProcessor(log logrus.FieldLogger) StatusProcessor {
@@ -97,7 +104,6 @@ func NewStatusProcessor(log logrus.FieldLogger) StatusProcessor {
 	exts.Add(extractors.NewValueWithUnit("switchLevel", "level"))
 	exts.Add(extractors.NewEnumValue("light", "switch", switchValues))
 	exts.Add(extractors.NewValueWithUnit("healthCheck", "checkInterval"))
-	exts.Add(extractors.NewValueWithUnit("healthCheck", "healthStatus"))
 	exts.Add(extractors.NewValueWithUnit("colorTemperature", "colorTemperature"))
 	exts.Add(extractors.NewValueWithUnit("colorControl", "hue"))
 	exts.Add(extractors.NewValueWithUnit("colorControl", "saturation"))
@@ -113,50 +119,86 @@ type statusProcessor struct {
 	log logrus.FieldLogger
 }
 
-func (c statusProcessor) Process(device *models.Device, status *models.DeviceStatus) ([]*Measurement) {
+func (c *statusProcessor) Process(statuses []*DeviceStatus) ([]*Measurement) {
 	var res []*Measurement
-	for component, componentStatus := range status.Components {
-		for capability, capabilityStatus := range componentStatus {
 
-			if len(capabilityStatus) == 0 {
-				continue
-			}
+	for _, status := range statuses {
 
-			if extrs, ok := c.extractors[capability]; ok {
-				for _, extractor := range extrs {
-					val, err := extractor.Extract(capabilityStatus)
-					if err != nil {
-						c.log.Errorf("failed to get attribute '%s' of capability '%s', error: %v", extractor.Attribute(), capability, err)
-						continue
-					}
+		measurement := c.GetHealthMeasurement(status.Device, status.Health)
+		if measurement != nil {
+			res = append(res, measurement)
+		}
 
-					unitSuffix := ""
+		for component, componentStatus := range status.Status.Components {
+			for capability, capabilityStatus := range componentStatus {
+				if len(capabilityStatus) == 0 {
+					continue
+				}
 
-					if len(val.Unit()) > 0 {
-						unit, ok := unitsMap[val.Unit()]
-						if !ok {
-							c.log.Errorf("attribute '%s' of capability '%s' has unsupported unit '%s'", extractor.Attribute(), capability, val.Unit())
-							continue
-						}
-						unitSuffix = "_" + unit
-					}
-
-					measurement := &Measurement{Labels: prometheus.Labels{}}
-					measurement.Name = "smartthings_" + toMetricName(capability) + "_" + toMetricName(extractor.Attribute()) + unitSuffix
-					measurement.Value = val.Value()
-					measurement.Labels["name"] = device.Name
-					measurement.Labels["label"] = device.Label
-					measurement.Labels["device_type_name"] = device.DeviceTypeName
-					measurement.Labels["component"] = component
-
+				measurement := c.GetCapabilityMeasurement(status.Device, component, capability, capabilityStatus)
+				if measurement != nil {
 					res = append(res, measurement)
 				}
-			} else {
-				c.log.Errorf("capability '%s' is not supported", capability)
 			}
 		}
 	}
+
 	return res
+}
+
+func (c *statusProcessor) GetHealthMeasurement(device *models.Device, health *health.DeviceHealth) *Measurement {
+	value, ok := healthStateMap[health.State]
+	if !ok {
+		c.log.Errorf("health state has unsupported value '%s'", health.State)
+		return nil
+	}
+
+	measurement := &Measurement{Labels: prometheus.Labels{}}
+
+	measurement.Name = "smartthings_health_state"
+	measurement.Value = value
+	measurement.Labels["name"] = device.Name
+	measurement.Labels["label"] = device.Label
+	measurement.Labels["device_type_name"] = device.DeviceTypeName
+
+	return measurement;
+}
+
+func (c *statusProcessor) GetCapabilityMeasurement(device *models.Device, component string, capability string, capabilityStatus models.CapabilityStatus) *Measurement {
+
+	if extrs, ok := c.extractors[capability]; ok {
+		for _, extractor := range extrs {
+			val, err := extractor.Extract(capabilityStatus)
+			if err != nil {
+				c.log.Errorf("failed to get attribute '%s' of capability '%s', error: %v", extractor.Attribute(), capability, err)
+				continue
+			}
+
+			unitSuffix := ""
+
+			if len(val.Unit()) > 0 {
+				unit, ok := unitsMap[val.Unit()]
+				if !ok {
+					c.log.Errorf("attribute '%s' of capability '%s' has unsupported unit '%s'", extractor.Attribute(), capability, val.Unit())
+					continue
+				}
+				unitSuffix = "_" + unit
+			}
+
+			measurement := &Measurement{Labels: prometheus.Labels{}}
+			measurement.Name = "smartthings_" + toMetricName(capability) + "_" + toMetricName(extractor.Attribute()) + unitSuffix
+			measurement.Value = val.Value()
+			measurement.Labels["name"] = device.Name
+			measurement.Labels["label"] = device.Label
+			measurement.Labels["device_type_name"] = device.DeviceTypeName
+			measurement.Labels["component"] = component
+
+			return measurement;
+		}
+	} else {
+		c.log.Errorf("capability '%s' is not supported", capability)
+	}
+	return nil
 }
 
 var (

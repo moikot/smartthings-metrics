@@ -13,7 +13,7 @@ func NewOrchestrator(token string, log logrus.FieldLogger) Orchestrator {
 	return &orchestrator{
 		recorder:  NewMetricRecorder(log),
 		processor: NewStatusProcessor(log),
-		reader:    NewDeviceReader(token),
+		reader:    NewDeviceReader(token, log),
 	}
 }
 
@@ -25,16 +25,14 @@ type orchestrator struct {
 }
 
 func (o *orchestrator) Execute() error {
-	statuses, err := o.reader.Read()
+	measurements := []*Measurement{}
+
+	statuses, err := o.reader.ReadStatuses()
 	if err != nil {
 		return err
 	}
 
-	measurements := []*Measurement{}
-
-	for _, status := range statuses {
-		measurements = append(measurements, o.processor.Process(status.Device, status.Status)...)
-	}
+	measurements = append(measurements, o.processor.Process(statuses)...)
 
 	o.recorder.Record(measurements)
 	return nil
