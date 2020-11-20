@@ -154,12 +154,10 @@ func (c *statusProcessor) GetHealthMeasurement(device *models.Device, health *he
 	}
 
 	measurement := &Measurement{Labels: prometheus.Labels{}}
-
 	measurement.Name = "smartthings_health_state"
 	measurement.Value = value
-	measurement.Labels["name"] = device.Name
-	measurement.Labels["label"] = device.Label
-	measurement.Labels["device_type_name"] = device.DeviceTypeName
+
+	addDeviceLabels(measurement, device)
 
 	return measurement;
 }
@@ -188,10 +186,9 @@ func (c *statusProcessor) GetCapabilityMeasurement(device *models.Device, compon
 			measurement := &Measurement{Labels: prometheus.Labels{}}
 			measurement.Name = "smartthings_" + toMetricName(capability) + "_" + toMetricName(extractor.Attribute()) + unitSuffix
 			measurement.Value = val.Value()
-			measurement.Labels["name"] = device.Name
-			measurement.Labels["label"] = device.Label
-			measurement.Labels["device_type_name"] = device.DeviceTypeName
 			measurement.Labels["component"] = component
+
+			addDeviceLabels(measurement, device)
 
 			return measurement;
 		}
@@ -216,4 +213,21 @@ func toSnakeCase(str string) string {
 	snake := matchFirstCap.ReplaceAllString(str, "${1}_${2}")
 	snake = matchAllCap.ReplaceAllString(snake, "${1}_${2}")
 	return strings.ToLower(snake)
+}
+
+func addDeviceLabels(measurement *Measurement, device *models.Device) {
+	measurement.Labels["name"] = device.Name
+	measurement.Labels["label"] = device.Label
+	if device.Dth != nil {
+		measurement.Labels["device_type_name"] = device.Dth.DeviceTypeName
+		measurement.Labels["device_type_id"] = device.Dth.DeviceTypeID
+		measurement.Labels["device_network_type"] = device.Dth.DeviceNetworkType
+	} else {
+		measurement.Labels["device_type_name"] = ""
+		measurement.Labels["device_type_id"] = ""
+		measurement.Labels["device_network_type"] = ""
+	}
+	measurement.Labels["device_id"] = device.DeviceID
+	measurement.Labels["location_id"] = device.LocationID
+	measurement.Labels["device_manufacturer_code"] = device.DeviceManufacturerCode
 }
