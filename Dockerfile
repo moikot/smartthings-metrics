@@ -15,7 +15,10 @@ RUN CGO_ENABLED=0 go build -a -o /bin/main .
 
 FROM scratch
 
+ARG APP_FOLDER
+
 COPY --from=build-env /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=build-env /bin/main /
+COPY --from=build-env ${APP_FOLDER}/units.json /
 
 ENTRYPOINT ["/main"]

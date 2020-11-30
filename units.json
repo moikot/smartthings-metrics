@@ -1,0 +1,20 @@
+{
+  "%": "percent",
+  "lux": "lux",
+  "s": "second",
+  "W": "watt",
+  "C": "degree_celsius",
+  "K": "degree_kelvin",
+  "F": "degree_fahrenheit",
+  "V": "volt",
+  "kg": "kilogram",
+  "lbs": "pound",
+  "\u65a4": "catty",
+  "CAQI": "caqi",
+  "dBm": "decibel_milliwatt",
+  "\u03bcg/m^3": "microgram_per_cubic_meter",
+  "mg/m^3": "milligram_per_cubic_meter",
+  "kg/m^2": "kilogram_per_square_meter",
+  "kWh": "kilowatt_hour",
+  "ppm": "parts_per_million"
+}
