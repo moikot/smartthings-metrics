@@ -1,6 +1,6 @@
 # SmartThings metrics
 ![ci](https://github.com/moikot/smartthings-metrics/workflows/ci/badge.svg)
-
+[![docker](https://images.microbadger.com/badges/version/moikot/smartthings-metrics.svg)](https://microbadger.com/images/moikot/smartthings-metrics)  
 A micro-service that provides SmartThings metrics to Prometheus.
 
 ## Run 
