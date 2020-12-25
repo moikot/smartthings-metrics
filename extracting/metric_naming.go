@@ -38,7 +38,7 @@ func getMetricName(compName, capName, attrName, unitSuffix string) string {
 	var buffer bytes.Buffer
 	buffer.WriteString("smartthings_")
 	if compName != "main" {
-		buffer.WriteString(toMetricName(capName))
+		buffer.WriteString(toMetricName(compName))
 		buffer.WriteString("_")
 	}
 	buffer.WriteString(toMetricName(capName))
