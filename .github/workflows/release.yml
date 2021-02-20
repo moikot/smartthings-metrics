@@ -36,6 +36,7 @@ jobs:
                echo ::set-output name=publish_chart::true
                echo ::set-output name=pull_policy::IfNotPresent
                echo ::set-output name=chart::smartthings-metrics
+               echo ::set-output name=chart_version::${MAJOR}.${MINOR}.${PATCH}
                echo ::set-output name=repository::${DOCKER_IMAGE}
                echo ::set-output name=tag::${MAJOR}.${MINOR}.${PATCH}
             else
@@ -51,8 +52,9 @@ jobs:
               echo ::set-output name=publish_chart::true
               echo ::set-output name=pull_policy::Always
               echo ::set-output name=chart::smartthings-metrics-${VERSION}
+              echo ::set-output name=chart_version::0.0.${GITHUB_RUN_NUMBER}
               echo ::set-output name=repository::${DOCKER_IMAGE}
-              echo ::set-output name=tag::0.0.${GITHUB_RUN_NUMBER}
+              echo ::set-output name=tag::${VERSION}
             fi
           elif [[ $GITHUB_REF == refs/pull/* ]]; then
             TAGS="${DOCKER_IMAGE}:pr-${{ github.event.number }}" 
@@ -114,9 +116,8 @@ jobs:
           yaml_file: chart/Chart.yaml
           values: |- 
             name=${{ steps.prep.outputs.chart }}
-            version=${{ steps.prep.outputs.tag }}
-            appVersion=${{ steps.prep.outputs.tag }}
-            pullPolicy= ${{ steps.prep.outputs.pull_policy }}
+            version=${{ steps.prep.outputs.chart_version }}
+            appVersion=${{ steps.prep.outputs.chart_version }}
 
       - name: Change the Helm chart values.yaml
         uses: moikot/yaml-tailor-action@v1
@@ -125,6 +126,7 @@ jobs:
           values: |- 
             image.repository=${{ steps.prep.outputs.repository }}
             image.tag=${{ steps.prep.outputs.tag }}
+            image.pullPolicy=${{ steps.prep.outputs.pull_policy }}
     
       - name: Publish the Helm chart
         id: publish-chart
