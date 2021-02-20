@@ -23,9 +23,7 @@ spec:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          args:
-            - '-token $(API_TOKEN)'
-            - '-interval $(REFRESH_INTERVAL)'
+          args: ["-token", "$(API_TOKEN)", "-interval", "$(REFRESH_INTERVAL)"]
           env:
             - name: API_TOKEN
               valueFrom:
