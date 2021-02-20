@@ -36,6 +36,7 @@ jobs:
                echo ::set-output name=publish_chart::true
                echo ::set-output name=pull_policy::IfNotPresent
                echo ::set-output name=chart::smartthings-metrics
+               echo ::set-output name=repository::${DOCKER_IMAGE}
                echo ::set-output name=tag::${MAJOR}.${MINOR}.${PATCH}
             else
                TAGS="${DOCKER_IMAGE}:${VERSION}"
@@ -50,6 +51,7 @@ jobs:
               echo ::set-output name=publish_chart::true
               echo ::set-output name=pull_policy::Always
               echo ::set-output name=chart::smartthings-metrics-${VERSION}
+              echo ::set-output name=repository::${DOCKER_IMAGE}
               echo ::set-output name=tag::0.0.${GITHUB_RUN_NUMBER}
             fi
           elif [[ $GITHUB_REF == refs/pull/* ]]; then
@@ -121,7 +123,7 @@ jobs:
         with:
           yaml_file: chart/values.yaml
           values: |- 
-            image.repository=${{ DOCKER_IMAGE }}
+            image.repository=${{ steps.prep.outputs.repository }}
             image.tag=${{ steps.prep.outputs.tag }}
     
       - name: Publish the Helm chart
