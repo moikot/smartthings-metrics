@@ -23,14 +23,15 @@ SOFTWARE.
 package readers
 
 import (
+	"net/http"
+	"time"
+
 	"github.com/go-openapi/runtime"
 	httptransport "github.com/go-openapi/runtime/client"
 	"github.com/moikot/smartthings-go/client"
 	"github.com/moikot/smartthings-go/client/devices"
 	"github.com/moikot/smartthings-go/models"
-	"github.com/sirupsen/logrus"
-	"net/http"
-	"time"
+	log "github.com/sirupsen/logrus"
 )
 
 type Component struct {
@@ -52,7 +53,7 @@ type DeviceReader interface {
 	ReadStatuses() ([]*DeviceStatus, error)
 }
 
-func NewDeviceReader(token string, log logrus.FieldLogger) DeviceReader {
+func NewDeviceReader(token string) DeviceReader {
 	auth := NewAuthInfoWriter(token)
 
 	httpClient := &http.Client{
@@ -73,7 +74,6 @@ func NewDeviceReader(token string, log logrus.FieldLogger) DeviceReader {
 		DeviceHealthAPI:  NewDeviceHealthAPI(rtm, nil),
 		CapabilityReader: NewCapabilityReader(rtm, nil),
 		auth:             auth,
-		log:              log,
 	}
 }
 
@@ -82,7 +82,6 @@ type statusReader struct {
 	*DeviceHealthAPI
 	*CapabilityReader
 	auth runtime.ClientAuthInfoWriter
-	log  logrus.FieldLogger
 }
 
 func (r *statusReader) ReadStatuses() ([]*DeviceStatus, error) {
@@ -97,7 +96,7 @@ func (r *statusReader) ReadStatuses() ([]*DeviceStatus, error) {
 		p.DeviceID = *dev.DeviceID
 		health, err := r.GetDeviceHealth(p, r.auth)
 		if err != nil {
-			r.log.Errorf("failed to health status of device '%s': %v", dev.DeviceID, err)
+			log.Errorf("failed to health status of device '%s': %v", dev.DeviceID, err)
 			continue
 		}
 
@@ -105,7 +104,7 @@ func (r *statusReader) ReadStatuses() ([]*DeviceStatus, error) {
 		params.DeviceID = *dev.DeviceID
 		status, err := r.Devices.GetDeviceStatus(params, r.auth)
 		if err != nil {
-			r.log.Errorf("failed to read status of device '%s': %v", dev.DeviceID, err)
+			log.Errorf("failed to read status of device '%s': %v", dev.DeviceID, err)
 			continue
 		}
 
@@ -124,7 +123,7 @@ func (r *statusReader) ReadStatuses() ([]*DeviceStatus, error) {
 			for _, capability := range component.Capabilities {
 				c, err := r.ReadCapability(*capability.ID, capability.Version, r.auth)
 				if err != nil {
-					r.log.Errorf("failed to read capability '%s' of device '%s': %v", capability.ID, dev.DeviceID, err)
+					log.Errorf("failed to read capability '%s' of device '%s': %v", capability.ID, dev.DeviceID, err)
 					continue
 				}
 				comp.Capabilities[*capability.ID] = c

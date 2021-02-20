@@ -23,15 +23,17 @@ SOFTWARE.
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
-	"github.com/moikot/smartthings-metrics/recording"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
+	"strings"
+
+	"github.com/moikot/smartthings-metrics/recording"
+	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -44,56 +46,84 @@ var (
 )
 
 func main() {
-	var token, intervalStr string
 
-	flag.StringVar(&token, "token", os.Getenv("API_TOKEN"), "The API token.")
-	flag.StringVar(&intervalStr, "interval", os.Getenv("REFRESH_INTERVAL"), "The status refresh interval in seconds.")
+	token := flag.String("token", "", "The API token.")
+	interval := flag.Uint("interval", 60, "The status refresh interval in seconds.")
+	verbosity := flag.String("verbosity", "info", "The verbosity level (error, warn, info, debug, trace).")
 
 	flag.Parse()
 
-	exitFunc(Run(token, intervalStr))
-}
-
-func ParseInterval(intervalStr string) (int, error) {
-	if len(intervalStr) > 0 {
-		interval, err := strconv.Atoi(intervalStr)
-		if err != nil {
-			return 0, errors.New("the interval specified is not an integer")
-		}
-		if interval <= 0 {
-			return 0, errors.New("the interval should be greater than zero")
-		}
-		return interval, nil
-	}
-	return 60, nil // Default interval is 60 seconds
-}
-
-func Run(token, intervalStr string) int {
-
-	if token == "" {
-		flag.PrintDefaults()
-		return 1
-	}
-
-	interval, err := ParseInterval(intervalStr)
+	args, err := validateArgs(*token, *interval, *verbosity)
 	if err != nil {
-		_, _ = fmt.Fprint(flag.CommandLine.Output(), err)
-		return 1
+		fmt.Fprint(flag.CommandLine.Output(), "error: ", err, "\n\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage: smartthings-metrics [flags]:\n")
+		flag.PrintDefaults()
+		exitFunc(1)
 	}
+
+	Run(*args)
+}
+
+// ParseLevel takes a string level and returns the Logrus log level constant.
+func ParseLevel(lvl string) (log.Level, error) {
+	switch strings.ToLower(lvl) {
+	case "error":
+		return log.ErrorLevel, nil
+	case "warn":
+		return log.WarnLevel, nil
+	case "info":
+		return log.InfoLevel, nil
+	case "debug":
+		return log.DebugLevel, nil
+	case "trace":
+		return log.TraceLevel, nil
+	}
+
+	var l log.Level
+	return l, fmt.Errorf("not a valid verbosity level: %q", lvl)
+}
+
+func Run(args args) {
+
+	log.SetFormatter(&log.JSONFormatter{})
+	log.SetLevel(args.level)
 
 	go servePrometheus(defaultPromAddr)
 
-	loop := recording.NewLoop(token, interval)
+	loop := recording.NewLoop(args.token, args.interval)
 	loop.Start()
 
 	signal.Notify(stopChan, os.Interrupt, os.Kill)
 	<-stopChan
+}
 
-	return 0
+type args struct {
+	token    string
+	interval uint
+	level    log.Level
+}
+
+func validateArgs(token string, interval uint, verbosity string) (*args, error) {
+	if token == "" {
+		return nil, errors.New("personal access token is not defined")
+	}
+
+	level, err := ParseLevel(verbosity)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to parse verbosity level")
+	}
+
+	return &args{
+		token:    token,
+		interval: interval,
+		level:    level,
+	}, nil
 }
 
 func servePrometheus(addr string) {
 	http.Handle("/metrics", promhttp.Handler())
+	log.Infof("server started at port %v", addr)
+
 	err := http.ListenAndServe(addr, nil)
 	if err != nil {
 		panic("unable to create HTTP server, error: " + err.Error())

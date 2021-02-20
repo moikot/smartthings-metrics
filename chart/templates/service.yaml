@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "_.fullname" . }}
+  annotations:
+    prometheus.io/scrape: "{{ .Values.prometheus.scrape }}"
+    prometheus.io/port: "{{ .Values.prometheus.port }}"
+  labels:
+    app.kubernetes.io/name: {{ include "_.name" . }}
+    helm.sh/chart: {{ include "_.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: metrics
+      port: {{ .Values.prometheus.port }}
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: {{ include "_.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}

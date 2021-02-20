@@ -25,11 +25,12 @@ package extracting
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+
 	"github.com/moikot/smartthings-go/models"
 	"github.com/moikot/smartthings-metrics/readers"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
-	"io/ioutil"
+	log "github.com/sirupsen/logrus"
 )
 
 const unitsFileName = "units.json"
@@ -50,10 +51,9 @@ type StatusProcessor interface {
 	GetMeasurements(statuses []*readers.DeviceStatus) []*Measurement
 }
 
-func NewStatusProcessor(log logrus.FieldLogger) StatusProcessor {
+func NewStatusProcessor() StatusProcessor {
 	return &statusProcessor{
-		valueExtractor: NewValueExtractor(log),
-		log:            log,
+		valueExtractor: NewValueExtractor(),
 		unitMap:        readUnitMap(unitsFileName),
 	}
 }
@@ -72,7 +72,6 @@ func readUnitMap(file string) map[string]string {
 }
 
 type statusProcessor struct {
-	log            logrus.FieldLogger
 	valueExtractor *ValueExtractor
 	unitMap        map[string]string
 }
@@ -84,7 +83,7 @@ func (p *statusProcessor) GetMeasurements(statuses []*readers.DeviceStatus) []*M
 
 		measurement, err := p.getHealthMeasurement(status.Health)
 		if err != nil {
-			p.log.Errorf("failed to get device '%s' health; %v", *status.Device.DeviceID, err)
+			log.Errorf("failed to get device '%s' health; %v", *status.Device.DeviceID, err)
 		} else {
 			setDeviceLabels(measurement, status.Device)
 			res = append(res, measurement)
@@ -134,7 +133,7 @@ func (p *statusProcessor) getUnitSuffix(unit string) string {
 		if ok {
 			return unit
 		} else {
-			p.log.Warnf("unit '%s' is not supported", unit)
+			log.Warnf("unit '%s' is not supported", unit)
 			return ""
 		}
 	}

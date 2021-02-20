@@ -12,11 +12,10 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     steps:
-      -
-        name: Checkout
+      - name: Checkout
         uses: actions/checkout@v2
-      -
-        name: Prepare
+
+      - name: Prepare
         id: prep
         run: |
           DOCKER_IMAGE=moikot/smartthings-metrics
@@ -33,57 +32,110 @@ jobs:
                TAGS="${TAGS},${DOCKER_IMAGE}:${MAJOR}.${MINOR}.${PATCH}"
 
                echo ::set-output name=push_readme::true
+
+               echo ::set-output name=publish_chart::true
+               echo ::set-output name=chart::smartthings-metrics
+               echo ::set-output name=repository::${DOCKER_IMAGE}
+               echo ::set-output name=tag::${MAJOR}.${MINOR}.${PATCH}
             else
                TAGS="${DOCKER_IMAGE}:${VERSION}"
             fi
           elif [[ $GITHUB_REF == refs/heads/* ]]; then
-            VERSION=$(echo ${GITHUB_REF#refs/heads/} | sed -r 's#/+#-#g')
             if [ "${{ github.event.repository.default_branch }}" = "$VERSION" ]; then
-              VERSION=edge
+              TAGS="${DOCKER_IMAGE}:edge" 
+            else  
+              VERSION=$(echo ${GITHUB_REF#refs/heads/} | sed -r 's#/+#-#g')
+              TAGS="${DOCKER_IMAGE}-${VERSION}:0.0.${GITHUB_RUN_NUMBER}" 
+              
+              echo ::set-output name=publish_chart::true
+              echo ::set-output name=chart::smartthings-metrics-${VERSION}
+              echo ::set-output name=repository::${DOCKER_IMAGE}-${VERSION}
+              echo ::set-output name=tag::0.0.${GITHUB_RUN_NUMBER}
             fi
-            TAGS="${DOCKER_IMAGE}:${VERSION}" 
           elif [[ $GITHUB_REF == refs/pull/* ]]; then
             TAGS="${DOCKER_IMAGE}:pr-${{ github.event.number }}" 
           fi
           echo ::set-output name=tags::${TAGS}
           echo ::set-output name=created::$(date -u +'%Y-%m-%dT%H:%M:%SZ')
-      -
-        name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
-      -
-        name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
-      -
-        name: Login to DockerHub
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@v1 
+
+      # - name: Set up QEMU
+      #   uses: docker/setup-qemu-action@v1
+
+      # - name: Set up Docker Buildx
+      #   uses: docker/setup-buildx-action@v1
+
+      # - name: Login to DockerHub
+      #   if: github.event_name != 'pull_request'
+      #   uses: docker/login-action@v1 
+      #   with:
+      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
+      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # - name: Build and push
+      #   id: docker_build
+      #   uses: docker/build-push-action@v2
+      #   with:
+      #     context: .
+      #     file: ./Dockerfile
+      #     platforms: linux/amd64,linux/arm64
+      #     push: ${{ github.event_name != 'pull_request' }}
+      #     tags: ${{ steps.prep.outputs.tags }}
+      #     build-args: |
+      #       APP_FOLDER=/go/src/github.com/moikot/smartthings-metrics
+      #     labels: |
+      #       org.opencontainers.image.title=${{ github.event.repository.name }}
+      #       org.opencontainers.image.description=${{ github.event.repository.description }}
+      #       org.opencontainers.image.url=${{ github.event.repository.html_url }}
+      #       org.opencontainers.image.source=${{ github.event.repository.clone_url }}
+      #       org.opencontainers.image.created=${{ steps.prep.outputs.created }}
+      #       org.opencontainers.image.revision=${{ github.sha }}
+      #       org.opencontainers.image.licenses=${{ github.event.repository.license.spdx_id }}
+
+      # - name: Update repo description
+      #   if: ${{ steps.prep.outputs.push_readme }}
+      #   uses: peter-evans/dockerhub-description@v2
+      #   with:
+      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
+      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+      - name: Checkout helm-charts
+        uses: actions/checkout@v2
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      -
-        name: Build and push
-        id: docker_build
-        uses: docker/build-push-action@v2
+          repository: moikot/helm-charts
+          ref: refs/heads/gh-pages
+          path: helm-charts
+          token: ${{ secrets.CHART_PUBLISH_TOKEN }}
+
+      - name: Change the Helm chart Chart.yaml
+        uses: moikot/yaml-tailor-action@v1
         with:
-          context: .
-          file: ./Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.prep.outputs.tags }}
-          build-args: |
-            APP_FOLDER=/go/src/github.com/moikot/smartthings-metrics
-          labels: |
-            org.opencontainers.image.title=${{ github.event.repository.name }}
-            org.opencontainers.image.description=${{ github.event.repository.description }}
-            org.opencontainers.image.url=${{ github.event.repository.html_url }}
-            org.opencontainers.image.source=${{ github.event.repository.clone_url }}
-            org.opencontainers.image.created=${{ steps.prep.outputs.created }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.licenses=${{ github.event.repository.license.spdx_id }}
-      -
-        name: Update repo description
-        if: ${{ steps.prep.outputs.push_readme }}
-        uses: peter-evans/dockerhub-description@v2
+          yaml_file: chart/Chart.yaml
+          values: |- 
+            name=${{ steps.prep.outputs.chart }}
+            version=${{ steps.prep.outputs.tag }}
+            appVersion=${{ steps.prep.outputs.tag }}
+
+      - name: Change the Helm chart values.yaml
+        uses: moikot/yaml-tailor-action@v1
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          yaml_file: chart/values.yaml
+          values: |- 
+            image.repository=${{ steps.prep.outputs.repository }}
+            image.tag=${{ steps.prep.outputs.tag }}
+    
+      - name: Publish the Helm chart
+        id: publish-chart
+        uses: moikot/chart-publish-action@v1
+        with:
+          charts_dir: "helm-charts"
+          charts_url: "https://moikot.github.io/helm-charts"
+
+      - name: Commit and push helm-charts
+        uses: EndBug/add-and-commit@v6
+        with:
+          author_name: Sergey Anisimov
+          author_email: sanisimov@moikot.com
+          branch: gh-pages
+          cwd: helm-charts
+          message: "Commit chart ${{ steps.publish-chart.outputs.chart }}"
+

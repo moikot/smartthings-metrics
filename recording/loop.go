@@ -23,22 +23,19 @@ SOFTWARE.
 package recording
 
 import (
+	"time"
+
 	"github.com/moikot/smartthings-metrics/extracting"
 	"github.com/moikot/smartthings-metrics/readers"
-	"github.com/prometheus/common/log"
-	"github.com/sirupsen/logrus"
-	"time"
+	log "github.com/sirupsen/logrus"
 )
 
-func NewLoop(token string, interval int) *Loop {
-	l := logrus.New()
-	l.SetFormatter(&logrus.JSONFormatter{})
+func NewLoop(token string, interval uint) *Loop {
 
 	return &Loop{
-		DeviceReader:    readers.NewDeviceReader(token, l),
-		StatusProcessor: extracting.NewStatusProcessor(l),
-		MetricRecorder:  NewMetricRecorder(l),
-		log:             l,
+		DeviceReader:    readers.NewDeviceReader(token),
+		StatusProcessor: extracting.NewStatusProcessor(),
+		MetricRecorder:  NewMetricRecorder(),
 		interval:        interval,
 	}
 }
@@ -47,8 +44,7 @@ type Loop struct {
 	readers.DeviceReader
 	extracting.StatusProcessor
 	MetricRecorder
-	log      logrus.FieldLogger
-	interval int
+	interval uint
 }
 
 func (l *Loop) Start() {

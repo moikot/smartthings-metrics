@@ -24,9 +24,10 @@ package extracting
 
 import (
 	"fmt"
+
 	"github.com/moikot/smartthings-go/models"
 	"github.com/moikot/smartthings-metrics/readers"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 type AttributeValue struct {
@@ -47,13 +48,11 @@ type AttributeValue struct {
 }
 
 type ValueExtractor struct {
-	log        logrus.FieldLogger
 	extFactory *ExtractorFactory
 }
 
-func NewValueExtractor(log logrus.FieldLogger) *ValueExtractor {
+func NewValueExtractor() *ValueExtractor {
 	return &ValueExtractor{
-		log:        log,
 		extFactory: NewExtractorFactory(),
 	}
 }
@@ -65,24 +64,24 @@ func (c *ValueExtractor) GetAttributeValues(status *models.DeviceStatus, schema 
 		for capName, capabilityStatus := range componentStatus {
 			exts, err := c.getExtractors(compName, capName, schema)
 			if err != nil {
-				c.log.Errorf("unable to process capability '%s': %v", capName, err)
+				log.Errorf("unable to process capability '%s': %v", capName, err)
 				continue
 			}
 			for attrName, extractor := range exts {
 				cStatus, ok := capabilityStatus[attrName]
 				if !ok {
-					c.log.Errorf("expected attribute '%s' is not found", attrName)
+					log.Errorf("expected attribute '%s' is not found", attrName)
 					continue
 				}
 
 				if cStatus.Value == nil {
-					c.log.Infof("value of attribute '%s' is not defined", attrName)
+					log.Debugf("value of attribute '%s' is not defined", attrName)
 					continue
 				}
 
 				val, err := extractor.Extract(cStatus)
 				if err != nil {
-					c.log.Errorf("failed to get the value of attribute '%s': %v", attrName, err)
+					log.Errorf("failed to get the value of attribute '%s': %v", attrName, err)
 					continue
 				}
 

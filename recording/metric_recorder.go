@@ -24,27 +24,26 @@ package recording
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/moikot/smartthings-metrics/extracting"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/sirupsen/logrus"
-	"strings"
+	log "github.com/sirupsen/logrus"
 )
 
 type MetricRecorder interface {
 	Record(attr []*extracting.Measurement)
 }
 
-func NewMetricRecorder(log logrus.FieldLogger) MetricRecorder {
+func NewMetricRecorder() MetricRecorder {
 	return &metricRecorder{
-		log:          log,
 		gaugeVecs:    map[string]*prometheus.GaugeVec{},
 		measurements: map[string]*extracting.Measurement{},
 	}
 }
 
 type metricRecorder struct {
-	log          logrus.FieldLogger
 	gaugeVecs    map[string]*prometheus.GaugeVec
 	measurements map[string]*extracting.Measurement
 }
@@ -72,7 +71,7 @@ func (r *metricRecorder) Record(measurements []*extracting.Measurement) {
 
 		gaugeVec.With(measurement.Labels).Set(measurement.Value)
 
-		r.log.Infof("gauge: '%s' value: %f labels: %s", measurement.Name, measurement.Value, printLabels(measurement.Labels))
+		log.Debugf("gauge: '%s' value: %f labels: %s", measurement.Name, measurement.Value, printLabels(measurement.Labels))
 	}
 
 	// Delete not observed vectors
@@ -80,7 +79,7 @@ func (r *metricRecorder) Record(measurements []*extracting.Measurement) {
 		if _, ok := observedMeasurements[key]; !ok {
 			if gaugeVec, ok := r.gaugeVecs[measurement.Name]; ok {
 				gaugeVec.Delete(measurement.Labels)
-				r.log.Infof("removed gauge: '%s' labels: %s", measurement.Name, printLabels(measurement.Labels))
+				log.Debugf("removed gauge: '%s' labels: %s", measurement.Name, printLabels(measurement.Labels))
 			}
 		}
 	}
